@@ -155,8 +155,20 @@ def _generate_once(rng, rows, cols, n_islands, max_extra_edges_ratio):
         if island_values[isl] == 0 or island_values[isl] > 8:
             return None
 
+    # ONEMLI (kesik hat / forbidden_connections ozelligi): candidate_edges
+    # icinde olup FIILEN kopru olarak kullanilmayan (yani placed_edges'te
+    # olmayan) 0-2 gorus-hattini "kesinlikle kopru olamaz" diye acik
+    # ediyoruz. Bu OPSIYONEL -- generator hic kullanmayabilir. Bu ciftler
+    # zaten witness'ta kullanilmadigi icin ekstra bir dogrulamaya gerek yok.
+    used_pairs = {(a, b) for (a, b, _c) in placed_edges}
+    unused_candidates = [(a, b) for (a, b) in candidate_edges if (a, b) not in used_pairs]
+    n_forbidden = rng.randint(0, min(2, len(unused_candidates)))
+    forbidden_sample = rng.sample(unused_candidates, n_forbidden) if n_forbidden else []
+    forbidden_connections = [[list(a), list(b)] for (a, b) in forbidden_sample]
+
     puzzle_islands = [{"pos": list(isl), "value": island_values[isl]} for isl in islands]
-    puzzle = {"game": "hashi", "size": [rows, cols], "islands": puzzle_islands}
+    puzzle = {"game": "hashi", "size": [rows, cols], "islands": puzzle_islands,
+              "forbidden_connections": forbidden_connections}
     solution = [{"from": list(a), "to": list(b), "count": cnt} for (a, b, cnt) in placed_edges]
     return puzzle, solution
 
@@ -253,6 +265,15 @@ def solve_hashi_backtrack(puzzle: dict, on_step=None, max_expansions: int = 2000
 
     try:
         propagate(list(island_positions))
+        # ONEMLI (kesik hat ozelligi): forbidden_connections varsa, cozume
+        # baslamadan ONCE bu kenarlari 0 (kopru yok) olarak sabitliyoruz.
+        for pair in puzzle.get("forbidden_connections", []):
+            a, b = tuple(pair[0]), tuple(pair[1])
+            e = tuple(sorted([a, b]))
+            if e in candidate_edges:
+                q = []
+                set_edge(e, 0, q)
+                propagate(q)
     except _Contradiction:
         return SolveResult(solved=False, error="on isleme sirasinda celiski")
 

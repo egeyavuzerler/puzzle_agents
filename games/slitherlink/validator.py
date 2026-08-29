@@ -7,6 +7,13 @@ SLITHERLINK:
   - Amac: nokta grid'i uzerinde TEK bir kapali dongu (loop) ciz. Her noktanin
     derecesi 0 ya da 2 olmali, dongu tek parca (bagli) olmali, her ipuclu
     hucrenin etrafindaki kenar sayisi ipucuyla eslesmeli.
+
+  - required_edges (OPSIYONEL): [[[r,c],[r,c]], ...] -- bu kenarlarin
+    COZUMDE KESINLIKLE dongunun parcasi olmasi zorunlu.
+  - forbidden_edges (OPSIYONEL): [[[r,c],[r,c]], ...] -- bu kenarlarin
+    COZUMDE KESINLIKLE dongude OLMAMASI zorunlu.
+  Ikisi de zorunlu degil (bos liste olabilir), ve ayni kenar ikisinde
+  birden olamaz (celiski olur).
 """
 
 from collections import defaultdict
@@ -23,6 +30,19 @@ class SlitherlinkValidator(BasePuzzleValidator):
         left = frozenset([(r, c), (r + 1, c)])
         right = frozenset([(r, c + 1), (r + 1, c + 1)])
         return [top, bottom, left, right]
+
+    def _parse_edge_list(self, raw_list, rows, cols, label):
+        parsed = []
+        for e in raw_list:
+            if len(e) != 2:
+                return None, f"{label} icindeki kenar {e} 2 noktadan olusmali"
+            (r1, c1), (r2, c2) = tuple(e[0]), tuple(e[1])
+            if not (0 <= r1 <= rows and 0 <= c1 <= cols and 0 <= r2 <= rows and 0 <= c2 <= cols):
+                return None, f"{label} icindeki kenar {e} grid disinda"
+            if abs(r1 - r2) + abs(c1 - c2) != 1:
+                return None, f"{label} icindeki kenar {e} komsu olmayan noktalar arasinda"
+            parsed.append(frozenset([(r1, c1), (r2, c2)]))
+        return parsed, None
 
     def validate_puzzle_shape(self, puzzle: dict) -> tuple[bool, str | None]:
         if puzzle.get("game") != "slitherlink":
@@ -44,6 +64,16 @@ class SlitherlinkValidator(BasePuzzleValidator):
             for v in row:
                 if v is not None and v not in (0, 1, 2, 3, 4):
                     return False, f"gecersiz clue degeri: {v}"
+
+        required, err = self._parse_edge_list(puzzle.get("required_edges", []), rows, cols, "required_edges")
+        if err:
+            return False, err
+        forbidden, err = self._parse_edge_list(puzzle.get("forbidden_edges", []), rows, cols, "forbidden_edges")
+        if err:
+            return False, err
+        overlap = set(required) & set(forbidden)
+        if overlap:
+            return False, f"required_edges ve forbidden_edges ayni kenari iceriyor: {overlap}"
 
         return True, None
 
@@ -67,6 +97,15 @@ class SlitherlinkValidator(BasePuzzleValidator):
 
         if not edges:
             return False, "hic kenar secilmemis"
+
+        for raw in puzzle.get("required_edges", []):
+            e = frozenset([tuple(raw[0]), tuple(raw[1])])
+            if e not in edges:
+                return False, f"required_edges kenari {tuple(raw)} dongude yok (zorunlu)"
+        for raw in puzzle.get("forbidden_edges", []):
+            e = frozenset([tuple(raw[0]), tuple(raw[1])])
+            if e in edges:
+                return False, f"forbidden_edges kenari {tuple(raw)} dongude var (yasak)"
 
         deg = defaultdict(int)
         adj = defaultdict(list)

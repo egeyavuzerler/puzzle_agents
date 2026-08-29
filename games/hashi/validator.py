@@ -12,6 +12,12 @@ HASHIWOKAKERO (Bridges):
       * kopruler birbirini KESEMEZ
       * her adanin uzerindeki kopru sayisi toplami, adanin degerine esit olmali
       * TUM adalar, kopruler araciligiyla TEK bir bagli ag olusturmali
+
+  - forbidden_connections (OPSIYONEL): [[[r,c],[r,c]], ...] -- her ikili,
+    aralarinda GORUS HATTI olan (yani normalde kopru kurulabilecek) iki
+    adayi belirtir, ama bu ikisi arasinda COZUMDE KESINLIKLE kopru
+    OLAMAZ. Bu, katilimciyi o "kesik hat"i goz ardi edip adalari BASKA
+    bir yoldan baglamaya zorlar.
 """
 
 from collections import defaultdict
@@ -80,6 +86,20 @@ class HashiValidator(BasePuzzleValidator):
             if not (1 <= isl["value"] <= 8):
                 return False, f"ada {isl} value'su 1-8 araliginda olmali"
 
+        seen_forbidden = set()
+        for pair in puzzle.get("forbidden_connections", []):
+            if len(pair) != 2:
+                return False, f"forbidden_connections ciftinde {pair} 2 ada olmali"
+            a, b = tuple(pair[0]), tuple(pair[1])
+            if a == b:
+                return False, f"forbidden_connections {pair} ayni adayi kendine bagliyor"
+            if a not in positions or b not in positions:
+                return False, f"forbidden_connections {pair} gecerli bir ada pozisyonuna isaret etmiyor"
+            key = frozenset([a, b])
+            if key in seen_forbidden:
+                return False, f"forbidden_connections {pair} tekrar ediyor"
+            seen_forbidden.add(key)
+
         return True, None
 
     def validate_solution(self, puzzle: dict, solution) -> tuple[bool, str | None]:
@@ -88,6 +108,8 @@ class HashiValidator(BasePuzzleValidator):
 
         islands = {tuple(i["pos"]): i["value"] for i in puzzle["islands"]}
         island_positions = set(islands.keys())
+
+        forbidden = {frozenset([tuple(pair[0]), tuple(pair[1])]) for pair in puzzle.get("forbidden_connections", [])}
 
         edges = []
         for b in solution:
@@ -99,6 +121,8 @@ class HashiValidator(BasePuzzleValidator):
                 return False, f"kenar {a}-{bb} duz (yatay/dikey) degil"
             if cnt not in (1, 2):
                 return False, f"kenar {a}-{bb} count degeri gecersiz: {cnt}"
+            if frozenset([a, bb]) in forbidden:
+                return False, f"kenar {a}-{bb} forbidden_connections'da yasakli"
             if a[0] == bb[0]:
                 r = a[0]
                 c1, c2 = sorted([a[1], bb[1]])

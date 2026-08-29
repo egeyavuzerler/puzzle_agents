@@ -134,7 +134,30 @@ def generate_slitherlink(rng: random.Random, difficulty: int) -> dict:
         if rng.random() < reveal_prob:
             clues[r][c] = cnt
 
-    puzzle = {"game": "slitherlink", "size": [rows, cols], "clues": clues}
+    # ONEMLI (zorunlu/yasak kenar ozelligi): witness dongumuz (edges) zaten
+    # elimizde -- ondan rastgele 0-2 kenari "required_edges" (dongude
+    # KESINLIKLE olmali) diye, dongu DISINDAKI (yani tum olasi kenarlar -
+    # edges) rastgele 0-2 kenari da "forbidden_edges" (dongude KESINLIKLE
+    # OLAMAZ) diye acik ediyoruz. Ikisi de OPSIYONEL -- generator hic
+    # kullanmayabilir (0 secilebilir). Witness zaten bu kenarlarla tutarli
+    # oldugu icin ekstra bir dogrulamaya gerek yok.
+    all_possible_edges = ({frozenset([(r, c), (r, c + 1)]) for r in range(rows + 1) for c in range(cols)} |
+                           {frozenset([(r, c), (r + 1, c)]) for r in range(rows) for c in range(cols + 1)})
+    non_loop_edges = list(all_possible_edges - edges)
+    loop_edges = list(edges)
+
+    n_required = rng.randint(0, min(2, len(loop_edges)))
+    n_forbidden = rng.randint(0, min(2, len(non_loop_edges)))
+    required_sample = rng.sample(loop_edges, n_required) if n_required else []
+    forbidden_sample = rng.sample(non_loop_edges, n_forbidden) if n_forbidden else []
+
+    required_edges = [sorted([list(p) for p in e]) for e in required_sample]
+    forbidden_edges = [sorted([list(p) for p in e]) for e in forbidden_sample]
+
+    puzzle = {
+        "game": "slitherlink", "size": [rows, cols], "clues": clues,
+        "required_edges": required_edges, "forbidden_edges": forbidden_edges,
+    }
     solution = [[list(pt) for pt in edge] for edge in edges]  # tek kapali dongu -- witness cozum
     return puzzle, solution
 
@@ -275,6 +298,20 @@ def solve_slitherlink_backtrack(puzzle: dict, on_step=None, max_expansions: int 
                 if clues[r][c] is not None:
                     init_queue.append(("cell", tuple(_cell_edge_list(r, c)), clues[r][c]))
         propagate(init_queue)
+
+        # ONEMLI (zorunlu/yasak kenar ozelligi): required_edges/forbidden_edges
+        # varsa, cozume baslamadan ONCE bu kenarlari sabitliyoruz -- boylece
+        # hem dogru cozum garanti edilir hem de arama uzayi daralir.
+        for raw in puzzle.get("required_edges", []):
+            e = frozenset([tuple(raw[0]), tuple(raw[1])])
+            q = deque()
+            set_edge(e, True, q)
+            propagate(q)
+        for raw in puzzle.get("forbidden_edges", []):
+            e = frozenset([tuple(raw[0]), tuple(raw[1])])
+            q = deque()
+            set_edge(e, False, q)
+            propagate(q)
     except _Contradiction:
         return SolveResult(solved=False, error="on isleme sirasinda celiski (gecersiz puzzle olabilir)")
 

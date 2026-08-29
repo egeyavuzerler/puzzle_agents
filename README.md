@@ -69,6 +69,16 @@ Farklı renklerin hücreleri birbirine komşu olabilir. Izgaranın her hücresin
 dolu olması **şart değil** (Flow varyantı, klasik Numberlink'ten farklı
 olarak bazı hücreler boş kalabilir).
 
+**Portal (opsiyonel kural):** Generator'ınız isterseniz birbirine
+"ışınlanma" ile bağlı **hücre çiftleri** (portal) yerleştirebilir. Bir
+rengin yolu, bu iki hücreyi **fiziksel komşuluk olmadan** ardışık olarak
+kullanabilir — yani yol bu noktada "atlar". Bu **zorunlu değildir** — hiç
+portal kullanmadan da geçerli Numberlink puzzle'ları üretebilirsiniz.
+Portal kullanırsanız, witness çözümünüzde bu iki hücrenin gerçekten
+ardışık olarak (yolun bir parçası olarak) kullanıldığından emin olun;
+sadece "aynı renk" olmaları yeterli değildir, aralarında **fiziksel komşuluk
+olmaması ve path içinde ardışık olmaları** gerekir.
+
 ### Hashiwokakero (Bridges)
 Numaralı adaları yatay/dikey köprülerle (1 ya da 2 telli) bağlayın:
 köprüler yalnızca aynı satır/sütundaki, arada başka ada olmayan iki ada
@@ -82,6 +92,14 @@ Her bölgede **tam 4 hücreyi** gölgeleyin; gölgelenen 4 hücre L, I, T ya da 
 tetromino şekillerinden birini oluşturmalı (dönüşler ve yansımalar serbest).
 Tüm gölgeli hücreler tek bir bağlı bütün oluşturmalı, hiçbir 2x2 alan
 tamamen gölgeli olamaz, birbirine komşu iki tetromino aynı tipte olamaz.
+
+**Zorunlu hücre (opsiyonel kural):** Generator'ınız isterseniz belirli
+hücreleri "kesinlikle gölgeli olmak zorunda" (`forced_shaded`) diye
+işaretleyebilir. Hangi tetrominoya ait olduğu ya da tetrominonun tipi
+**söylenmez** — sadece o hücrenin çözümde mutlaka gölgeli olması gerektiği
+belirtilir. Bu **zorunlu değildir** — hiç zorunlu hücre kullanmadan da
+geçerli LITS puzzle'ları üretebilirsiniz. Kullanırsanız, witness
+çözümünüzün bu hücreleri gerçekten gölgelediğinden emin olun.
 
 ### Yin-Yang
 Tüm hücreleri siyah/beyaz boyayın: tüm siyah hücreler kendi aralarında bağlı

@@ -63,6 +63,13 @@ Nokta ızgarası üzerinde **tek bir kapalı döngü** (loop) çizin. Her noktan
 derecesi 0 ya da 2 olmalı, döngü tek parça (bağlı) olmalı, her ipuçlu
 hücrenin etrafındaki döngü-kenarı sayısı ipucuyla eşleşmeli.
 
+**Zorunlu/yasak kenar (opsiyonel kural):** Generator'ınız isterseniz belirli
+kenarları `required_edges` (döngüde **kesinlikle olmalı**) ya da
+`forbidden_edges` (döngüde **kesinlikle olamaz**) diye işaretleyebilir. Bu
+**zorunlu değildir** — hiç kullanmadan da geçerli Slitherlink puzzle'ları
+üretebilirsiniz. Aynı kenar iki listede birden olamaz. Kullanırsanız,
+witness çözümünüzün bu kısıtlarla tutarlı olduğundan emin olun.
+
 ### Numberlink (Flow varyantı)
 Aynı renkli iki uç noktayı, **kendine değmeyen** basit bir yolla birleştirin.
 Farklı renklerin hücreleri birbirine komşu olabilir. Izgaranın her hücresinin
@@ -86,6 +93,13 @@ arasında olabilir; bir bağlantıda en fazla 2 köprü olabilir; köprüler
 birbirini kesemez; her adanın üzerindeki köprü sayısı toplamı adanın
 değerine eşit olmalı; **tüm adalar** köprüler aracılığıyla tek bir bağlı ağ
 oluşturmalı.
+
+**Kesik hat (opsiyonel kural):** Generator'ınız isterseniz görüş hattı olan
+(yani normalde köprü kurulabilecek) iki adayı `forbidden_connections` ile
+"bu ikisi arasında **kesinlikle köprü olamaz**" diye işaretleyebilir. Bu
+**zorunlu değildir** — hiç kullanmadan da geçerli Hashi puzzle'ları
+üretebilirsiniz. Bu, katılımcıyı o bağlantıyı göz ardı edip adaları başka
+bir yoldan bağlamaya zorlar.
 
 ### LITS
 Her bölgede **tam 4 hücreyi** gölgeleyin; gölgelenen 4 hücre L, I, T ya da S

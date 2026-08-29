@@ -13,6 +13,13 @@ LITS:
         butun olusturmali
       * hicbir 2x2 alan tamamen golgeli olamaz
       * birbirine komsu (dokunan) iki tetromino AYNI TIPTE olamaz
+
+  - forced_shaded (OPSIYONEL): [[r,c], ...] -- bu hucrelerin COZUMDE
+    KESINLIKLE golgeli olmasi zorunludur. Hangi tetromino'ya ait olduklari
+    ya da hangi tipte olduklari SOYLENMEZ -- sadece "bu hucre kesinlikle
+    golgeli" bilgisi verilir. Bu, cozum uzayini daraltir ama HANGI sekle
+    ait oldugunu ve komsu bolgelerle nasil uyusmasi gerektigini bulmak
+    yine de katilimciya kalir.
 """
 
 from collections import defaultdict
@@ -102,6 +109,16 @@ class LitsValidator(BasePuzzleValidator):
         if len(region_sizes) < 4:
             return False, "en az 4 bolge olmali"
 
+        forced_shaded = puzzle.get("forced_shaded", [])
+        seen_forced = set()
+        for cell in forced_shaded:
+            r, c = cell
+            if not (0 <= r < rows and 0 <= c < cols):
+                return False, f"forced_shaded hucresi {cell} grid disinda"
+            if (r, c) in seen_forced:
+                return False, f"forced_shaded hucresi {cell} tekrar ediyor"
+            seen_forced.add((r, c))
+
         return True, None
 
     def validate_solution(self, puzzle: dict, solution) -> tuple[bool, str | None]:
@@ -119,6 +136,10 @@ class LitsValidator(BasePuzzleValidator):
             if (r, c) in shaded:
                 return False, f"hucre {cell} tekrar ediyor"
             shaded.add((r, c))
+
+        for cell in puzzle.get("forced_shaded", []):
+            if tuple(cell) not in shaded:
+                return False, f"forced_shaded hucresi {tuple(cell)} golgeli degil (zorunlu)"
 
         for r in range(rows - 1):
             for c in range(cols - 1):

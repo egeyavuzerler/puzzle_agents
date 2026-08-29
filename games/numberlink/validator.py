@@ -9,6 +9,14 @@ NUMBERLINK (Flow tarzi):
     ama bir rengin kendi hucreleri arasinda fazladan komsuluk OLAMAZ.
   - NOT: bu varyant "Flow" tarzidir -- izgaranin HER hucresinin dolu olmasi
     SART DEGIL (bazi hucreler bos kalabilir).
+
+  - portals (OPSIYONEL): [[[r1,c1],[r2,c2]], ...] -- her ikili, birbirine
+    "isinlanma" ile baglanan iki hucreyi belirtir. Bir renk yolu bu iki
+    hucreyi (GRID KOMSULUGU OLMADAN) ardisik olarak kullanirsa, bu ikisi
+    o rengin yolunda birbirine BAGLI sayilir (normal grid-komsulugu gibi).
+    Bu, path-bazli mantigi degistirmeden yeni bir baglanti imkani sunar --
+    dogru cozumu bulmak icin artik SADECE yerel/fiziksel komsuluk yeterli
+    degil, portallari da hesaba katmak gerekir.
 """
 
 from collections import defaultdict
@@ -49,6 +57,22 @@ class NumberlinkValidator(BasePuzzleValidator):
             if len(positions) != 2:
                 return False, f"renk {color}: {len(positions)} endpoint var, tam 2 olmali"
 
+        portals = puzzle.get("portals", [])
+        seen_portal_cells = set()
+        for portal in portals:
+            if not (isinstance(portal, (list, tuple)) and len(portal) == 2):
+                return False, f"portal {portal} tam 2 hucreden olusmali"
+            a, b = tuple(portal[0]), tuple(portal[1])
+            if a == b:
+                return False, f"portal {portal} ayni hucreyi kendine bagliyor"
+            for cell in (a, b):
+                r, c = cell
+                if not (0 <= r < rows and 0 <= c < cols):
+                    return False, f"portal hucresi {cell} grid disinda"
+                if cell in seen_portal_cells:
+                    return False, f"portal hucresi {cell} birden fazla portalde kullaniliyor"
+                seen_portal_cells.add(cell)
+
         return True, None
 
     def validate_solution(self, puzzle: dict, solution) -> tuple[bool, str | None]:
@@ -75,6 +99,12 @@ class NumberlinkValidator(BasePuzzleValidator):
             if color not in ep_by_color:
                 return False, f"solution'da tanimsiz bir renk var: {color}"
 
+        portal_partner = {}
+        for portal in puzzle.get("portals", []):
+            a, b = tuple(portal[0]), tuple(portal[1])
+            portal_partner[a] = b
+            portal_partner[b] = a
+
         for color, eps in ep_by_color.items():
             cells = [(r, c) for r in range(rows) for c in range(cols) if solution[r][c] == color]
             eps_set = set(eps)
@@ -91,6 +121,10 @@ class NumberlinkValidator(BasePuzzleValidator):
                     if nb in cellset:
                         d += 1
                         adj[(r, c)].append(nb)
+                partner = portal_partner.get((r, c))
+                if partner is not None and partner in cellset:
+                    d += 1
+                    adj[(r, c)].append(partner)
                 deg[(r, c)] = d
 
             for cell in cells:

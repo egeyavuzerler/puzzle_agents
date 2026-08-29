@@ -24,12 +24,25 @@ def _neighbors(cell, rows, cols):
     return result
 
 
-def _grow_path_greedy(rng, start, occupied, rows, cols, target_length):
+def _step_candidates(cell, rows, cols, portal_of):
+    """Normal grid komsulari + (varsa) bu hucrenin portal ortagi.
+    Portal ortagi, fiziksel olarak komsu OLMASA da gecerli bir 'sonraki
+    adim' sayilir -- validator da ayni mantikla dogruluyor (bkz.
+    games/numberlink/validator.py)."""
+    result = _neighbors(cell, rows, cols)
+    partner = portal_of.get(cell) if portal_of else None
+    if partner is not None:
+        result.append(partner)
+    return result
+
+
+def _grow_path_greedy(rng, start, occupied, rows, cols, target_length, portal_of=None):
+    portal_of = portal_of or {}
     path = [start]
     used = {start}
     while len(path) < target_length:
         candidates = []
-        for cand in _neighbors(path[-1], rows, cols):
+        for cand in _step_candidates(path[-1], rows, cols, portal_of):
             if cand in occupied or cand in used:
                 continue
             ok = True
@@ -47,11 +60,31 @@ def _grow_path_greedy(rng, start, occupied, rows, cols, target_length):
     return path
 
 
-def _try_generate_once(rng, rows, cols, n_colors, min_len):
+def _try_generate_once(rng, rows, cols, n_colors, min_len, max_portal_pairs=2):
     all_cells = [(r, c) for r in range(rows) for c in range(cols)]
     occupied = set()
     colors = []
     max_len = max(min_len, (rows * cols) // n_colors)
+
+    # ONEMLI (portal ozelligi): portal cifti(leri) OPSIYONEL -- generator
+    # hic portal kullanmayabilir (n_portal_pairs=0 da secilebilir). Portal
+    # hucreleri, color path'leri uretilmeden ONCE, bos hucreler arasindan
+    # rastgele secilir; buyume asamasinda (_grow_path_greedy) bu hucreler
+    # normal bir "adim" gibi kullanilabilir (fiziksel komsuluk olmadan).
+    n_portal_pairs = rng.randint(0, max_portal_pairs)
+    portal_of = {}
+    portal_pairs = []
+    if n_portal_pairs > 0:
+        pool = list(all_cells)
+        rng.shuffle(pool)
+        needed = n_portal_pairs * 2
+        if len(pool) >= needed:
+            chosen = pool[:needed]
+            for i in range(0, needed, 2):
+                a, b = chosen[i], chosen[i + 1]
+                portal_of[a] = b
+                portal_of[b] = a
+                portal_pairs.append((a, b))
 
     for _color_id in range(n_colors):
         candidates_start = [c for c in all_cells if c not in occupied]
@@ -59,7 +92,7 @@ def _try_generate_once(rng, rows, cols, n_colors, min_len):
             return None
         start = rng.choice(candidates_start)
         target_length = rng.randint(min_len, max_len)
-        path = _grow_path_greedy(rng, start, occupied, rows, cols, target_length)
+        path = _grow_path_greedy(rng, start, occupied, rows, cols, target_length, portal_of)
         if len(path) < 2:
             return None
         colors.append(path)
@@ -67,12 +100,27 @@ def _try_generate_once(rng, rows, cols, n_colors, min_len):
 
     endpoints = []
     solution_grid = [[None] * cols for _ in range(rows)]
+    used_portal_pairs = set()
     for color_id, seg in enumerate(colors):
         endpoints.append({"color": color_id, "pos": list(seg[0])})
         endpoints.append({"color": color_id, "pos": list(seg[-1])})
         for (r, c) in seg:
             solution_grid[r][c] = color_id
-    puzzle = {"game": "numberlink", "size": [rows, cols], "endpoints": endpoints}
+        # ONEMLI: bir portal'in GERCEKTEN kullanildigini soylemek icin
+        # "ayni renk mi" yetmez -- iki ucu ayni renk ama path icinde
+        # ARDISIK OLMAYAN (baska bir sebeple aralarinda komsuluk kurulmus)
+        # hucreler de "ayni renk" olabilir, bu YANLIS BIR SEKILDE fazladan
+        # bir baglanti (validator'da derece +1) sayilir. Bu yuzden SADECE
+        # path icinde ARDISIK VE FIZIKSEL OLARAK KOMSU OLMAYAN ciftleri
+        # (yani gercekten portal atlamasi yapilmis olanlari) sayiyoruz.
+        for i in range(len(seg) - 1):
+            a, b = seg[i], seg[i + 1]
+            if abs(a[0] - b[0]) + abs(a[1] - b[1]) != 1:  # grid-komsusu degil -> portal atlamasi
+                used_portal_pairs.add(frozenset((a, b)))
+
+    used_portals = [sorted([list(x) for x in pair]) for pair in used_portal_pairs]
+
+    puzzle = {"game": "numberlink", "size": [rows, cols], "endpoints": endpoints, "portals": used_portals}
     return puzzle, solution_grid
 
 
@@ -99,6 +147,12 @@ def solve_numberlink(puzzle: dict, time_limit_s: float = 30.0, max_expansions: i
     ep_by_color = defaultdict(list)
     for e in endpoints:
         ep_by_color[e["color"]].append(tuple(e["pos"]))
+
+    portal_of = {}
+    for portal in puzzle.get("portals", []):
+        a, b = tuple(portal[0]), tuple(portal[1])
+        portal_of[a] = b
+        portal_of[b] = a
 
     colors = sorted(
         ep_by_color.keys(),
@@ -132,7 +186,7 @@ def solve_numberlink(puzzle: dict, time_limit_s: float = 30.0, max_expansions: i
             if path[-1] == end:
                 return True
             cands = []
-            for nb in _neighbors(path[-1], rows, cols):
+            for nb in _step_candidates(path[-1], rows, cols, portal_of):
                 if nb != end and (nb in occupied or nb in used):
                     continue
                 ok = True

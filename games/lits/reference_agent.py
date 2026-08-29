@@ -278,7 +278,22 @@ def _generate_once(rng, rows, cols, min_cell, max_cell, max_nodes):
         return False
 
     if backtrack(0):
-        return region_grid, [list(cell) for cell in shaded]
+        # ONEMLI (zorunlu hucre / forced_shaded ozelligi): backtracking
+        # BASARILI oldu, yani `placed` artik her bolge icin secilen gercek
+        # tetromino hucrelerini iceriyor. Bu NOKTADAN itibaren rastgele
+        # birkac bolgeden (region basina EN FAZLA 1 hucre) birer hucreyi
+        # "kesinlikle golgeli" diye acik ediyoruz. Bu OPSIYONEL bir kural --
+        # katilimci kendi generator'inda hic forced_shaded kullanmayabilir.
+        # Bu hucreler zaten BULUNMUS witness cozumden secildigi icin ekstra
+        # bir dogrulamaya gerek yok -- otomatik olarak tutarli.
+        forced_shaded = []
+        region_ids = list(placed.keys())
+        rng.shuffle(region_ids)
+        n_forced = rng.randint(0, min(3, len(region_ids)))
+        for rid in region_ids[:n_forced]:
+            _typ, pcells = placed[rid]
+            forced_shaded.append(list(rng.choice(sorted(pcells))))
+        return region_grid, [list(cell) for cell in shaded], forced_shaded
     return None
 
 
@@ -292,8 +307,10 @@ def generate_lits(rng: random.Random, difficulty: int, max_outer_attempts: int =
     for _ in range(max_outer_attempts):
         result = _generate_once(rng, rows, cols, min_cell, max_cell, max_nodes=15000)
         if result is not None:
-            region_grid, solution = result
-            return {"game": "lits", "size": [rows, cols], "regions": region_grid}, solution
+            region_grid, solution, forced_shaded = result
+            puzzle = {"game": "lits", "size": [rows, cols], "regions": region_grid,
+                      "forced_shaded": forced_shaded}
+            return puzzle, solution
     raise RuntimeError(f"{max_outer_attempts} denemede gecerli lits puzzle uretilemedi")
 
 
@@ -306,8 +323,24 @@ def solve_lits_backtrack(puzzle: dict, on_step=None, max_nodes: int = 300000) ->
         for c in range(cols):
             region_cells[regions[r][c]].append((r, c))
 
+    # ONEMLI (zorunlu hucre / forced_shaded ozelligi): bir bolgede zorunlu
+    # golgeli hucre varsa, o bolge icin SADECE bu hucreyi iceren
+    # tetromino adaylarini dene -- hem arama uzayini daraltir (performans)
+    # hem de dogrulugu garanti eder (validate_solution'daki forced_shaded
+    # kontrolunu otomatik gecer).
+    forced_by_region = {}
+    for cell in puzzle.get("forced_shaded", []):
+        r, c = cell
+        forced_by_region[regions[r][c]] = (r, c)
+
     adj = _region_adjacency(region_cells)
-    all_cands = {rid: _candidates_for_region(cells) for rid, cells in region_cells.items()}
+    all_cands = {}
+    for rid, cells in region_cells.items():
+        cands = _candidates_for_region(cells)
+        forced_cell = forced_by_region.get(rid)
+        if forced_cell is not None:
+            cands = [tc for tc in cands if forced_cell in tc[1]]
+        all_cands[rid] = cands
     order = sorted(region_cells.keys(), key=lambda rid: len(all_cands[rid]))
 
     placed = {}

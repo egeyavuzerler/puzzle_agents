@@ -32,7 +32,7 @@ class LiveZipView:
         self.rows, self.cols = puzzle["size"]
         self.blocked = {tuple(c) for c in puzzle.get("blocked_cells", [])}
         self.checkpoints = puzzle["checkpoints"]
-        self.free_total = self.rows * self.cols - len(self.blocked)
+        self.free_total = self.rows * self.cols - len(self.blocked) - 1
         self.redraw_every = max(1, redraw_every)
         self.pause = pause
         self.min_redraw_interval = min_redraw_interval

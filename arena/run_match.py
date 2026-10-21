@@ -130,7 +130,8 @@ def run_match(solver, bank_path: str, time_limit_s: float, hard_timeout_s: float
             validator = get_validator(game)
 
             per_game.setdefault(game, {"total": 0, "solved": 0, "invalid_solution": 0,
-                                        "timeout_or_error": 0, "total_time": 0.0, "solved_time": 0.0})
+                                        "timeout_or_error": 0, "total_time": 0.0, "solved_time": 0.0,
+                                        "timeouts": 0, "errors": 0, "first_error": None})
             stat = per_game[game]
             stat["total"] += 1
             total += 1
@@ -145,6 +146,12 @@ def run_match(solver, bank_path: str, time_limit_s: float, hard_timeout_s: float
 
             if result.error:
                 stat["timeout_or_error"] += 1
+                if str(result.error).startswith("HARD TIMEOUT"):
+                    stat["timeouts"] += 1
+                else:
+                    stat["errors"] += 1
+                if stat["first_error"] is None:
+                    stat["first_error"] = str(result.error)[:300]
                 continue
             if not result.solved:
                 stat["timeout_or_error"] += 1
@@ -158,6 +165,8 @@ def run_match(solver, bank_path: str, time_limit_s: float, hard_timeout_s: float
                 total_solved_time += result.time_seconds
             else:
                 stat["invalid_solution"] += 1  # solver "çözdüm" dedi ama çözüm yanlış
+                if stat["first_error"] is None:
+                    stat["first_error"] = f"gecersiz cozum: {str(err)[:250]}"
 
     summary = {
         "solver": getattr(solver, "name", solver.__class__.__name__),

@@ -60,7 +60,7 @@ def build_bank(generator, per_type: int, out_path: str, max_retries_per_puzzle: 
                 solutions_out_path: str | None = None, gen_timeout_s: float = 20.0,
                 gen_memory_mb: int = 1024, gen_cpu_seconds: int = 60,
                 isolate: bool = True, max_consecutive_failures: int = 10,
-                game_time_budget_s: float | None = 600.0) -> dict:
+                game_time_budget_s: float | None = 600.0, games: list[str] | None = None) -> dict:
     """
     ÖNEMLİ (unsolvable puzzle koruması): generator.generate() artık
     (puzzle, solution) ikilisi döndürür. Bir puzzle bank'e girebilmesi için
@@ -96,7 +96,13 @@ def build_bank(generator, per_type: int, out_path: str, max_retries_per_puzzle: 
     generator bu eksikten puan alamaz) ve `per_game[oyun]["gave_up"]` nedeni yazar.
     """
     _auto_register_defaults()
-    games = list_games()
+    all_games = list_games()
+    if games is None:
+        games = all_games
+    else:
+        unknown = [g for g in games if g not in all_games]
+        if unknown:
+            raise ValueError(f"bilinmeyen oyun(lar): {unknown} (bilinenler: {all_games})")
 
     written = 0
     failed_shape = 0
@@ -105,7 +111,8 @@ def build_bank(generator, per_type: int, out_path: str, max_retries_per_puzzle: 
     failed_duplicate = 0
     seen_puzzles: set[str] = set()   # bank'te ZATEN olan puzzle'lar (tekrar kabul edilmez)
     stats_per_game = {g: {"ok": 0, "failed_shape": 0, "failed_solution": 0, "failed_error": 0,
-                          "failed_duplicate": 0, "gave_up": None, "skipped": 0} for g in games}
+                          "failed_duplicate": 0, "gave_up": None, "skipped": 0,
+                          "example_error": None, "seconds": 0.0} for g in games}
 
     worker = IsolatedWorker(generator, gen_memory_mb, gen_cpu_seconds) if isolate else None
 
@@ -198,6 +205,8 @@ def build_bank(generator, per_type: int, out_path: str, max_retries_per_puzzle: 
 
                     if ok_puzzle is None:
                         consecutive_failures += 1
+                        if stats_per_game[game]["example_error"] is None:   # katilimciya gosterilecek ilk hata
+                            stats_per_game[game]["example_error"] = f"{last_err_kind}: {str(last_err)[:300]}"
                         if last_err_kind == "solution":
                             failed_solution += 1
                             stats_per_game[game]["failed_solution"] += 1
@@ -228,6 +237,7 @@ def build_bank(generator, per_type: int, out_path: str, max_retries_per_puzzle: 
                     stats_per_game[game]["ok"] += 1
 
                 stats_per_game[game]["gave_up"] = gave_up
+                stats_per_game[game]["seconds"] = round(time.time() - game_start, 2)
                 stats_per_game[game]["skipped"] = per_type - attempted
     finally:
         if worker is not None:

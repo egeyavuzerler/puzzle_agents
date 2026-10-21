@@ -32,7 +32,8 @@ def _crash_safe(fn):
         try:
             return fn(self, *args, **kwargs)
         except Exception as e:
-            return False, f"gecersiz girdi ({type(e).__name__}: {e})"
+            return False, (f"gecersiz girdi/format ({type(e).__name__}: {e}) -- degerlerin dogru tipte "
+                           f"oldugundan emin olun (ornegin hucre koordinatlari tam sayi olmali)")
     return wrapper
 
 

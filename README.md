@@ -24,6 +24,22 @@ gerçek çözülme oranına bakılır.
   sadece o puzzle "çözülemedi" sayılır.
 - Skor: solver'ınızın, diğer takımların havuzlarındaki puzzle'ların kaçını
   gerçekten çözebildiği (oyun türü bazlı ve genel oran).
+- Generator'ınız da izole bir process'te çalışır: her `generate()` çağrısı için
+  bir süre sınırı (varsayılan 20 sn) ve bellek limiti vardır. Aşan ya da hata
+  veren çağrı sadece o deneme için "başarısız" sayılır. Bir oyunda art arda
+  çok sayıda puzzle üretilemezse (ya da o oyuna ayrılan süre dolarsa) o
+  oyundan vazgeçilir.
+- Havuzdaki puzzle'lar birbirinden **farklı** olmalıdır: birebir aynı puzzle
+  ikinci kez havuza girmez. Puzzle'ların tek çözümlü olması gerekmez; verilen
+  kuralları sağlayan **her** geçerli çözüm kabul edilir.
+- **Havuzu eksiksiz doldurun.** Generator skorunuz hesaplanırken havuzunuzda
+  eksik kalan kısım (üretilemeyen, reddedilen, tekrar eden puzzle'lar; hiç
+  puzzle'ı olmayan oyunlar dahil) rakipler tarafından çözülmüş sayılır; yani o
+  kısımdan puan alamazsınız. Zor oyunları atlamak size avantaj sağlamaz.
+- Oyunlar varsayılan olarak eşit ağırlıklıdır (organizatör ağırlıkları
+  değiştirebilir). Skorlar eşitse sıralamayı, hakemin ölçtüğü çözüm süresi
+  belirler: solver'larda daha hızlı olan, generator'larda puzzle'ları
+  rakiplere daha uzun sürede çözdüren öndedir.
 
 ---
 
@@ -178,6 +194,27 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install matplotlib
 ```
 
+**Hızlı başlangıç:** `starter/my_agent.py` dosyasını kopyalayıp takım adınızla
+yeniden adlandırın (örneğin `takim_x/agent.py`). Şablon olduğu haliyle
+**hemen çalışır** — 10 oyunun hepsi için referans ajanlara yönlenir; siz oyunları
+tek tek kendi kodunuzla değiştirerek ilerlersiniz.
+
+**Göndermeden önce kontrol edin (önemli):**
+```bash
+python3 arena/check_submission.py \
+    --generator takim_x.agent:MyGenerator \
+    --solver takim_x.agent:MySolver
+```
+Bu komut, generator ve solver'ınızı organizatörün kullanacağı **aynı izole
+hat** ile dener: generator'ınızın her oyundan ürettiği puzzle'ların kaçı havuza
+girerdi, solver'ınız hem referans puzzle'ları hem kendi puzzle'larınızı
+çözerken hata veriyor mu (cevabınız JSON'a çevrilebilmeli — örneğin numpy dizisi
+ya da `set` döndürmeyin). Her sorun, hangi oyunda ve neden olduğuyla
+yazdırılır. `[HATA]` varsa düzeltin; `[UYARI]`lar göndermenizi engellemez ama
+bakmaya değer. Kodunuz proje kökünün dışındaysa `--path klasor`, sadece bazı
+oyunları denemek için `--games zip,queens`, daha fazla puzzle için
+`--per-type 5` kullanın.
+
 **Generator'ınızı test edin — kendi puzzle havuzunuzu üretin:**
 ```bash
 python3 bank/build_bank.py \
@@ -189,9 +226,11 @@ python3 bank/build_bank.py \
 `modul_yolu:SinifAdi`'nızı yazın. Test için `--per-type 5` gibi küçük bir
 sayı kullanabilirsiniz, hızlı sonuç alırsınız.)
 
-Çıktıda her oyun için `ok` / `failed_shape` / `failed_solution` sayılarını
-göreceksiniz — `failed_solution` sayısı yüksekse generator'ınız çözülemez
-puzzle'lar üretiyor demektir, bunu düzeltmeniz gerekir.
+Çıktıda her oyun için `ok` / `failed_shape` / `failed_solution` /
+`failed_error` (hata, zaman aşımı, çökme) / `failed_duplicate` (tekrar eden
+puzzle) sayılarını göreceksiniz — `failed_solution` sayısı yüksekse
+generator'ınız çözülemez puzzle'lar üretiyor demektir, bunu düzeltmeniz
+gerekir.
 
 **Solver'ınızı test edin — kendi havuzunuza karşı koşturun:**
 ```bash

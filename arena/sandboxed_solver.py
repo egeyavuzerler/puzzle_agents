@@ -59,7 +59,8 @@ class SandboxedSolver:
 
     def __init__(self, solver_spec: str, mode: str = "local", docker_image: str = "puzzle-arena",
                  submission_dir: str | None = None, memory_mb: int = 1024, cpu_seconds: int = 60,
-                 startup_timeout_s: float = 90.0, child_stderr=None):
+                 startup_timeout_s: float = 90.0, child_stderr=None,
+                 extra_pythonpath: list[str] | None = None):
         if mode not in ("local", "docker"):
             raise ValueError(f"gecersiz mod: {mode!r}")
         self.name = solver_spec
@@ -71,6 +72,7 @@ class SandboxedSolver:
         self.cpu_seconds = cpu_seconds
         self.startup_timeout_s = startup_timeout_s
         self.child_stderr = child_stderr   # None: solver'in stderr'i terminale akar
+        self.extra_pythonpath = [str(Path(p).resolve()) for p in (extra_pythonpath or [])]  # sadece local mod
         self._proc = None
         self._q = None
         self._container = None
@@ -118,7 +120,7 @@ class SandboxedSolver:
         if self.mode == "local":
             # Hakemin ortam degiskenlerini (token, anahtar vb.) solver'a SIZDIRMA
             env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-                   "PYTHONPATH": str(ROOT), "PYTHONUNBUFFERED": "1",
+                   "PYTHONPATH": os.pathsep.join([str(ROOT), *self.extra_pythonpath]), "PYTHONUNBUFFERED": "1",
                    "PYTHONDONTWRITEBYTECODE": "1"}
         try:
             self._proc = subprocess.Popen(

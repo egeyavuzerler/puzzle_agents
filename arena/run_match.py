@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core.registry import _auto_register_defaults, get_validator
 from core.base import SolveResult
+from arena.sandboxed_solver import SandboxedSolver
 
 try:
     import resource  # Unix/macOS only -- Windows'ta yok
@@ -117,6 +118,7 @@ def run_match(solver, bank_path: str, time_limit_s: float, hard_timeout_s: float
     total = 0
     total_solved = 0
     total_time = 0.0
+    total_solved_time = 0.0
 
     with open(bank_path) as f:
         for line_no, line in enumerate(f):
@@ -128,12 +130,16 @@ def run_match(solver, bank_path: str, time_limit_s: float, hard_timeout_s: float
             validator = get_validator(game)
 
             per_game.setdefault(game, {"total": 0, "solved": 0, "invalid_solution": 0,
-                                        "timeout_or_error": 0, "total_time": 0.0})
+                                        "timeout_or_error": 0, "total_time": 0.0, "solved_time": 0.0})
             stat = per_game[game]
             stat["total"] += 1
             total += 1
 
-            result = run_one(solver, puzzle, time_limit_s, hard_timeout_s, memory_mb, cpu_seconds)
+            if getattr(solver, "is_sandboxed", False):
+                # Sandbox'taki solver kendi sure/oldurme mantigini yonetir (arena/sandboxed_solver.py)
+                result = solver.solve(puzzle, time_limit_s, hard_timeout_s)
+            else:
+                result = run_one(solver, puzzle, time_limit_s, hard_timeout_s, memory_mb, cpu_seconds)
             stat["total_time"] += result.time_seconds
             total_time += result.time_seconds
 
@@ -147,7 +153,9 @@ def run_match(solver, bank_path: str, time_limit_s: float, hard_timeout_s: float
             valid, err = validator.validate_solution(puzzle, result.solution)
             if valid:
                 stat["solved"] += 1
+                stat["solved_time"] += result.time_seconds   # hakemin ölçtüğü süre
                 total_solved += 1
+                total_solved_time += result.time_seconds
             else:
                 stat["invalid_solution"] += 1  # solver "çözdüm" dedi ama çözüm yanlış
 
@@ -158,8 +166,10 @@ def run_match(solver, bank_path: str, time_limit_s: float, hard_timeout_s: float
         "total_solved": total_solved,
         "solve_rate": round(total_solved / total, 4) if total else 0.0,
         "avg_time_s": round(total_time / total, 3) if total else 0.0,
+        "avg_solved_time_s": round(total_solved_time / total_solved, 3) if total_solved else None,
         "per_game": {
-            g: {**s, "solve_rate": round(s["solved"] / s["total"], 4) if s["total"] else 0.0}
+            g: {**s, "solve_rate": round(s["solved"] / s["total"], 4) if s["total"] else 0.0,
+                "avg_solved_time_s": round(s["solved_time"] / s["solved"], 3) if s["solved"] else None}
             for g, s in per_game.items()
         },
     }
@@ -179,16 +189,34 @@ def main():
     parser.add_argument("--cpu-seconds", type=int, default=60,
                          help="solver process'ine CPU süresi limiti (saniye, varsayılan 60)")
     parser.add_argument("--max-puzzles", type=int, default=None, help="test için havuzun bir kısmı")
+    parser.add_argument("--sandbox", choices=["none", "local", "docker"], default="none",
+                         help="solver'ı nerede çalıştır: none (eski davranış, hakemle aynı process ağacı), "
+                              "local (ayrı process, dosya/ağ izolasyonu YOK), "
+                              "docker (ağsız, salt-okunur container -- yarışma günü bunu kullan)")
+    parser.add_argument("--docker-image", default="puzzle-arena", help="--sandbox docker için image adı")
+    parser.add_argument("--submission-dir", default=None,
+                         help="--sandbox docker: katılımcı kodunun bulunduğu klasör (container'a SALT-OKUNUR bağlanır). "
+                              "Proje kökünü VERME: bank/ ve results/ da görünür olur.")
     parser.add_argument("--out", default=None)
     args = parser.parse_args()
 
     hard_timeout = args.hard_timeout if args.hard_timeout is not None else args.time_limit + 5.0
 
-    SolverClass = load_solver_class(args.solver)
-    solver = SolverClass()
+    if args.sandbox == "none":
+        SolverClass = load_solver_class(args.solver)
+        solver = SolverClass()
+    else:
+        # Katılımcı modülü hakem process'inde IMPORT EDİLMEZ (import anında çalışan kod da izole kalsın)
+        solver = SandboxedSolver(args.solver, mode=args.sandbox, docker_image=args.docker_image,
+                                  submission_dir=args.submission_dir, memory_mb=args.memory_mb,
+                                  cpu_seconds=args.cpu_seconds)
 
-    summary = run_match(solver, args.bank, args.time_limit, hard_timeout,
-                         args.memory_mb, args.cpu_seconds, args.max_puzzles)
+    try:
+        summary = run_match(solver, args.bank, args.time_limit, hard_timeout,
+                             args.memory_mb, args.cpu_seconds, args.max_puzzles)
+    finally:
+        if hasattr(solver, "close"):
+            solver.close()
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
     if args.out:

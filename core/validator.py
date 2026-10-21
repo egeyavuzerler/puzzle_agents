@@ -15,11 +15,35 @@ Bu iki fonksiyon ayrı çünkü "kötü puzzle" (generator hatası) ile
 ayrı ayrı raporlanacak.
 """
 
+import functools
 from abc import ABC, abstractmethod
+
+
+def _crash_safe(fn):
+    """
+    Validator metodunu sarar: icinde herhangi bir istisna (TypeError,
+    IndexError, KeyError, ...) olursa process'i dusurmek yerine
+    (False, hata_mesaji) dondurur. Katilimci ciktisi (puzzle ya da solution)
+    beklenmedik tipte degerler (ornegin sayi yerine string) icerebilir;
+    hakem bunlar yuzunden asla cokmemeli, sadece "gecersiz" demeli.
+    """
+    @functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return fn(self, *args, **kwargs)
+        except Exception as e:
+            return False, f"gecersiz girdi ({type(e).__name__}: {e})"
+    return wrapper
 
 
 class BasePuzzleValidator(ABC):
     game_name: str = "unnamed_game"
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        for name in ("validate_puzzle_shape", "validate_solution"):
+            if name in cls.__dict__:
+                setattr(cls, name, _crash_safe(cls.__dict__[name]))
 
     @abstractmethod
     def validate_puzzle_shape(self, puzzle: dict) -> tuple[bool, str | None]:

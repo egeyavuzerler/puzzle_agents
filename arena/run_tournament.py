@@ -122,7 +122,7 @@ def print_leaderboard(result):
     print("\n" + "=" * 60)
     print("GENERATOR SIRALAMASI (yuksek = puzzle'lari rakiplere daha zor geldi)")
     print("=" * 60)
-    for name, score in sorted(result["generator_scores"].items(), key=lambda x: x[1]):
+    for name, score in sorted(result["generator_scores"].items(), key=lambda x: -x[1]):
         print(f"  {name:20s}  {score:.3f}")
 
     print("\n" + "=" * 60)

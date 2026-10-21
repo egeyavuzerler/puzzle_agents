@@ -217,7 +217,7 @@ def generate_zip(rng: random.Random, difficulty: int, max_block_attempts: int = 
             if path is None:
                 continue  # bu n_blocks seviyesinde basarili olamadik -- bir azalt
 
-        n_checkpoints = min(5 + (10 - difficulty) // 2, len(path))
+        n_checkpoints = min(5 + difficulty // 2, len(path))
         middle_indices = (rng.sample(range(1, len(path) - 1), max(0, n_checkpoints - 2))
                            if n_checkpoints > 2 else [])
         checkpoint_indices = sorted({0, len(path) - 1} | set(middle_indices))

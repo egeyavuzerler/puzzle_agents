@@ -19,10 +19,11 @@
 #
 #   4) Katilimci GENERATOR'unu container'da calistir (bank'i container uretir;
 #      root basladigi icin generate() worker'i 'nobody'ye duser ve bank dosyasina
-#      yazamaz; SETUID/SETGID capability'si bunun icin gerekli):
+#      yazamaz; SETUID/SETGID capability'si bunun icin, KILL capability'si ise
+#      takilan worker'i oldurebilmek icin gerekli):
 #        mkdir -p out && chmod 777 out
 #        docker run --rm --user 0:0 --network none --read-only --tmpfs /tmp:rw,size=256m \
-#            --cap-drop ALL --cap-add SETUID --cap-add SETGID --cap-add DAC_OVERRIDE \
+#            --cap-drop ALL --cap-add SETUID --cap-add SETGID --cap-add DAC_OVERRIDE --cap-add KILL \
 #            --security-opt no-new-privileges --pids-limit 256 --memory 4g \
 #            -e PYTHONPATH=/submission:/app \
 #            --mount type=bind,src="$PWD/submissions/takimA",dst=/submission,readonly \

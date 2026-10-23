@@ -139,11 +139,19 @@ class IsolatedWorker:
     def _stop(self) -> None:
         if self._proc is not None:
             if self._proc.is_alive():
-                self._proc.terminate()
-                self._proc.join(2)
-                if self._proc.is_alive():
-                    self._proc.kill()
+                try:
+                    self._proc.terminate()
                     self._proc.join(2)
+                    if self._proc.is_alive():
+                        self._proc.kill()
+                        self._proc.join(2)
+                except PermissionError:
+                    # worker baska kullaniciya dustu (nobody) ve bu process'in oldurme yetkisi yok.
+                    # Docker'da --cap-add KILL gerekir. Cokmek yerine uyar ve devam et.
+                    import sys
+                    print("[sandbox] UYARI: worker oldurulemedi (PermissionError). Container'da "
+                          "--cap-add KILL verin; aksi halde takilan worker'lar artik process olarak kalir.",
+                          file=sys.stderr, flush=True)
         if self._conn is not None:
             try:
                 self._conn.close()

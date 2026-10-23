@@ -1,6 +1,7 @@
 .git
 venv
-bank
+bank/*
+!bank/build_bank.py
 results
 benchmark
 __pycache__

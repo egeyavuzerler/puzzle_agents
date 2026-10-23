@@ -71,7 +71,13 @@ class SnoopSolver(BaseSolverAgent):
             findings.append("AG: ERISILDI (izolasyon YOK)")
         except Exception as e:
             findings.append(f"AG: ENGELLI ({type(e).__name__})")
-        for path in ("bank", "results", "bank/solutions.jsonl", "/etc/shadow", "../bank"):
+        # bank/ klasorunun kendisi container icinde de var (sadece build_bank.py); asil mesele
+        # puzzle/solution dosyalari (*.jsonl) gorunuyor mu.
+        import glob
+        jsonl = glob.glob("bank/**/*.jsonl", recursive=True) + glob.glob("../bank/**/*.jsonl", recursive=True)
+        findings.append(f"BANK .jsonl: {len(jsonl)} dosya GORUNUR (izolasyon YOK)" if jsonl
+                        else "BANK .jsonl: ENGELLI (hic dosya gorunmuyor)")
+        for path in ("results", "bank/solutions.jsonl", "/etc/shadow"):
             try:
                 _os.listdir(path) if _os.path.isdir(path) else open(path).read(1)
                 findings.append(f"DOSYA {path}: OKUNDU (izolasyon YOK)")
